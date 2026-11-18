@@ -1,83 +1,47 @@
-# Capy2API for CLIProxyAPI (experimental)
+# Capy2API — Capy free-model bridge for CLIProxyAPI
 
-Community, **unofficial** provider plugin for [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) 8.x. It maps OpenAI Chat Completions requests to the **documented Capy Thread API**, not the Capy website's private endpoints.
+> **Status: research / not operational.** This repository targets the **free models shown in the Capy web/app model selector**, not the metered Capy Agent API. No verified implementation of the free-model route or Capy account login exists yet. Do not deploy this as a working provider.
 
-## Features and limits
+## Target
 
-- ✅ CLIProxyAPI C-ABI plugin (Linux `.so`) with model registration and credential parser.
-- ✅ Import a Capy **official API key** and existing project ID; static keys do not auto-refresh.
-- ✅ `POST /threads`, `GET /threads/{id}`, `GET /threads/{id}/messages` bridged through CPA host HTTP transport.
-- ✅ Text-only `/v1/chat/completions`, including multi-turn messages flattened into a new Capy thread.
-- ⚠️ Streaming is **buffered SSE**. The current plugin waits for the full agent answer before sending chunks.
-- ❌ No Capy web-session cookie login, browser OAuth, token theft, or bypass of subscription checks. Capy does not document a third-party OAuth flow.
-- ❌ No image/audio, tool/function calling, Responses-native state, or actual model token accounting.
-- ❌ Capy cloud machine time and API usage may **cost credits**, even for models labeled free in the UI. Do not assume free API routing.
-- ⚠️ This prototype has **not** been tested against a live Capy account or a running CLIProxyAPI instance. It has only been compiled and unit-tested offline.
+Expose eligible Capy free-model access (for example, DeepSeek V4.1 Flash and GLM-5.3-Flash, if available for the account) to self-hosted [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), then optionally to New API.
 
-## Build (Linux)
+Intended flow:
 
-You need Go 1.21+ and a C compiler (`gcc`). Inside `plugin/`:
-
-```bash
-CGO_ENABLED=1 go build -buildmode=c-shared -o ../capy.so .
+```text
+New API / OpenAI client
+       |
+CLIProxyAPI 8.x provider plugin
+       |
+Capy account authentication (supported, consented flow — TBD)
+       |
+Capy free model route (availability, terms and protocol — TBD)
 ```
 
-> CLIProxyAPI official releases may be compiled without CGO. Use a CPA binary with native dynamic plugin support or rebuild CPA with CGO and the plugin loader enabled. Native plugins are trusted code and run in-process.
+## Verified facts
 
-Copy `capy.so` to CPA's plugin directory (`plugins/linux/amd64/capy.so` or `plugins/capy.so`) and add the config below. Restart CPA.
+- CLIProxyAPI 8.x provides a C-ABI dynamic plugin mechanism with model registration, auth records, and executors. See [official example](https://github.com/router-for-me/CLIProxyAPI/tree/main/examples/plugin/simple).
+- Capy's **documented** API lives at `https://api.capy.ai/api/v1` and authenticates with a key created at **Settings → API**.
+- The documented Capy API creates project-bound agent threads, not OpenAI chat completions. API access and the free/ad-supported options shown in the Capy UI **must not be assumed to have the same entitlement**.
+- The Capy API documentation does **not** establish a third-party OAuth flow for authenticating a CLIProxyAPI plugin to the ad-supported free-model routing.
 
-```yaml
-plugins:
-  enabled: true
-  dir: plugins
-  configs:
-    capy:
-      enabled: true
-      priority: 20
-```
+## Required validation before implementation
 
-## Authentication: import API key, not OAuth
+1. Establish whether Capy explicitly permits external application access to the free/ad-supported model selection, including ads or other user-facing eligibility conditions.
+2. Establish a supported Capy account authorization mechanism for a local third-party client (OAuth, device flow, or other documented method). No credential capture or hidden session scraping.
+3. With a dedicated test account, verify model selection, reply transport, rate limits, error handling, regional availability, and billing against Capy-provided documentation or authorized integration.
+4. Once supported, implement and test the CLIProxyAPI provider plugin; then verify its models through `/v1/models` and actual Chat Completions via a New API compatible channel.
 
-1. Sign into `https://capy.ai` in your browser and create a personal API key at **Settings → API**.
-2. Find an accessible project ID via `GET https://api.capy.ai/api/v1/projects` (see the snippet below).
-3. Create an auth file `~/.cli-proxy-api/capy-main.json` using `examples/capy-main.json` as a template, substituting your own secret and project ID. Protect with `chmod 600`.
-4. Confirm CPA Management API lists the Capy credential and model IDs. CPA accepts `/v1/chat/completions` from downstream clients including New API.
+## Separate official API prototype
 
-```bash
-curl -fsS https://api.capy.ai/api/v1/projects \
-  -H "Authorization: Bearer $CAPY_API_KEY"
-```
+An experimental local **official API key → Capy Thread API** prototype was prepared, but it is **not** the free-model-login plugin described here. It is intentionally not represented as the finished solution or published as a working Capy free router.
 
-**Never paste your API key into chat or commit your filled-in credential file to Git.** The official Capy API uses `Authorization: Bearer capy_...`, not cookies.
+## Security
 
-## Models
+Never commit Capy credentials, cookies, authorization headers, JWTs, HAR traces with sessions, or API keys. Do not bypass advertisements, access controls, quotas, or regional restrictions.
 
-| CPA model | Capy upstream model ID |
-| --- | --- |
-| `capy-deepseek-v4.1-flash` | `deepseek/deepseek-v4.1-flash-1017` |
-| `capy-glm-5.3-flash` | `zai/glm-5.3-flash` |
+## References
 
-First check your account's actual model permissions with `GET https://api.capy.ai/api/v1/models`. A name appearing in an API model list does not guarantee free usage or that a specific account may execute it.
-
-## New API
-
-Once your CLIProxyAPI `/v1/models` shows `capy-*` models, add an **OpenAI-compatible** channel in your New API with the existing CLIProxyAPI base URL and client API key. No Capy secret should be entered in New API.
-
-## Tests
-
-```bash
-cd plugin && go test ./...
-```
-
-Unit tests mock the Capy API at the HTTP bridge boundary. Live end-to-end testing still requires your credentials and billing confirmation.
-
-## Official documentation
-
-- Capy API: https://docs.capy.ai/api-reference/overview
-- Create threads: https://docs.capy.ai/api-reference/threads/create-thread
-- List messages: https://docs.capy.ai/api-reference/messages/list-thread-messages
-- CLIProxyAPI plugin ABI: https://github.com/router-for-me/CLIProxyAPI/tree/main/examples/plugin/simple
-
-## Design note
-
-This implementation explicitly does **not** emulate a raw DeepSeek/GLM API. Capy is an agent that runs work in a project on a machine. Thus latency, semantics, cloud costs, and response shape differ from a pure completion API. Agent instructions and tools are not carried over from OpenAI's function-calling contract.
+- [Capy REST API](https://docs.capy.ai/api-reference/overview)
+- [Capy Thread creation](https://docs.capy.ai/api-reference/threads/create-thread)
+- [CLIProxyAPI plugin examples](https://github.com/router-for-me/CLIProxyAPI/tree/main/examples/plugin/simple)
