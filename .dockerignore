@@ -1,0 +1,7 @@
+# Only application sources and the recipe belong in the build context.
+# In particular, never send .env*, data/, or captured credentials to Docker.
+**
+!Dockerfile
+!app/
+!app/**/*.py
+app/**/__pycache__/

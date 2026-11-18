@@ -1,0 +1,24 @@
+data/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+
+# Local runtime data, captures, and private deployment overrides
+backups/
+logs/
+*.log
+*.bak
+*.bak.*
+*.before-*
+*.har
+*.pem
+*.key
+cookie*.txt
+jwt*.txt
+docker-compose.override.yml
+docker-compose.override.yaml
+compose.override.yml
+compose.override.yaml
+.pi/
