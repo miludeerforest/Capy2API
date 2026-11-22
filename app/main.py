@@ -334,8 +334,7 @@ async def chat_completions(request: Request):
     for option in ("functions", "function_call", "response_format",
                    "max_tokens", "max_completion_tokens", "temperature", "top_p", "stop",
                    "presence_penalty", "frequency_penalty", "logprobs", "seed"):
-        if body.get(option) is not None:
-            raise HTTPException(400, f"{option} is unsupported by the web agent bridge")
+        body.pop(option, None)  # 静默忽略不支持的可选参数，兼容一般 openai 客户端
     if body.get("n", 1) != 1:
         raise HTTPException(400, "only n=1 is supported")
     stream = body.get("stream", False)
